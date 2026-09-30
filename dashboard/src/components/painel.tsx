@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, HardDrive, RefreshCw, Sprout, X } from "lucide-react";
+import { CloudOff, Database, HardDrive, RefreshCw, Sprout, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -10,6 +10,7 @@ import {
   resumir,
   type Filtros,
 } from "@/lib/agregacoes";
+import { buscarPainel } from "@/lib/api";
 import { ANOMALIAS, NOME_ANOMALIA, formatarData, formatarDataHora, type Anomalia } from "@/lib/formatos";
 import type { DadosPainel } from "@/lib/tipos";
 
@@ -18,11 +19,6 @@ import { GraficoComparativo, GraficoFrequencia, GraficoTendencia } from "./grafi
 import { Indicadores } from "./indicadores";
 import { TabelaCargas, TabelaRevisao } from "./operacao";
 import { ListaAlertas, SituacaoTalhoes } from "./talhoes-alertas";
-
-async function buscarPainel(forcar: boolean): Promise<DadosPainel | null> {
-  const resposta = await fetch(`/api/painel${forcar ? "?atualizar=1" : ""}`, { cache: "no-store" }).catch(() => null);
-  return resposta?.ok ? resposta.json().catch(() => null) : null;
-}
 
 const PERIODOS = [
   { dias: 7, rotulo: "7 dias" },
@@ -38,20 +34,19 @@ export function Painel({ inicial }: { inicial: DadosPainel }) {
 
   useEffect(() => {
     let ativo = true;
-    buscarPainel(false).then((novos) => {
+    buscarPainel(inicial, false).then((novos) => {
       if (!ativo) return;
-      if (novos) setDados(novos);
+      setDados(novos);
       setCarregando(false);
     });
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [inicial]);
 
   async function atualizar() {
     setCarregando(true);
-    const novos = await buscarPainel(true);
-    if (novos) setDados(novos);
+    setDados(await buscarPainel(dados, true));
     setCarregando(false);
   }
 
@@ -83,15 +78,15 @@ export function Painel({ inicial }: { inicial: DadosPainel }) {
           resumo={resumo}
           resumoAnterior={resumoAnterior}
           filtros={filtros}
-          status={dados.status}
+          talhoes={dados.talhoes}
           periodo={filtros.periodo}
         />
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <ListaAlertas alertas={dados.alertas} status={dados.status} filtros={filtros} />
+          <ListaAlertas alertas={dados.alertas} talhoes={dados.talhoes} filtros={filtros} />
           <SituacaoTalhoes
             className="lg:col-span-2"
-            status={dados.status}
+            talhoes={dados.talhoes}
             filtros={filtros}
             onSelecionar={(fazenda, talhao) =>
               setFiltros((atual) => ({ ...atual, fazenda, talhao: atual.talhao === talhao ? "" : talhao }))
@@ -107,7 +102,7 @@ export function Painel({ inicial }: { inicial: DadosPainel }) {
         <div className="grid gap-4 lg:grid-cols-3">
           <GraficoComparativo
             ocorrencias={dados.ocorrencias}
-            status={dados.status}
+            talhoes={dados.talhoes}
             filtros={filtros}
             inicio={janela.inicio}
             fim={janela.fim}
@@ -115,7 +110,7 @@ export function Painel({ inicial }: { inicial: DadosPainel }) {
           <GraficoClima
             className="lg:col-span-2"
             clima={dados.clima}
-            status={dados.status}
+            talhoes={dados.talhoes}
             filtros={filtros}
             inicio={janela.inicio}
             fim={janela.fim}
@@ -146,8 +141,10 @@ function Cabecalho({
   onAtualizar: () => void;
 }) {
   const aoVivo = dados.fonte === "databricks";
-  const fazendas = new Set(dados.status.map((talhao) => talhao.fazenda_id)).size;
-  const referencia = dados.status[0]?.data_referencia;
+  const foraDoAr = !aoVivo && Boolean(dados.erro);
+  const hora = formatarDataHora(dados.atualizadoEm);
+  const fazendas = new Set(dados.talhoes.map((talhao) => talhao.fazenda_id)).size;
+  const referencia = dados.talhoes[0]?.data_referencia;
 
   return (
     <header className="border-b border-borda bg-superficie">
@@ -159,7 +156,7 @@ function Cabecalho({
           <div>
             <h1 className="text-base font-semibold text-tinta">AgroSmart · Painel da lavoura</h1>
             <p className="text-xs text-tinta-2">
-              {fazendas} fazendas · {dados.status.length} talhões de batata
+              {fazendas} fazendas · {dados.talhoes.length} talhões de batata
               {referencia && ` · dados até ${formatarData(referencia)}`}
             </p>
           </div>
@@ -168,18 +165,22 @@ function Cabecalho({
         <div className="flex items-center gap-2">
           <span
             className="inline-flex items-center gap-1.5 rounded-full border border-borda px-2.5 py-1 text-xs text-tinta-2"
-            title={dados.aviso}
+            title={dados.erro}
           >
             {aoVivo ? (
               <Database size={13} className="text-status-bom" aria-hidden />
+            ) : foraDoAr ? (
+              <CloudOff size={13} className="text-status-atencao" aria-hidden />
             ) : (
               <HardDrive size={13} className="text-tinta-3" aria-hidden />
             )}
             {carregando
               ? "Consultando o Databricks…"
               : aoVivo
-                ? `Databricks · ao vivo (${formatarDataHora(dados.atualizadoEm)})`
-                : `Snapshot local (${formatarDataHora(dados.atualizadoEm)})`}
+                ? `Databricks · ao vivo (${hora})`
+                : foraDoAr
+                  ? `Databricks fora do ar · exibindo cópia de ${hora}`
+                  : `Cópia local dos dados (${hora})`}
           </span>
           <button
             type="button"
@@ -212,8 +213,8 @@ function BarraFiltros({
   inicio: string;
   fim: string;
 }) {
-  const fazendas = [...new Map(dados.status.map((t) => [t.fazenda_id, t])).values()];
-  const talhoes = dados.status.filter((t) => !filtros.fazenda || t.fazenda_id === filtros.fazenda);
+  const fazendas = [...new Map(dados.talhoes.map((t) => [t.fazenda_id, t])).values()];
+  const talhoesDaFazenda = dados.talhoes.filter((t) => !filtros.fazenda || t.fazenda_id === filtros.fazenda);
   const alterado = JSON.stringify(filtros) !== JSON.stringify(FILTROS_INICIAIS);
 
   return (
@@ -254,12 +255,12 @@ function BarraFiltros({
           className={CLASSE_SELECT}
           value={filtros.talhao}
           onChange={(evento) => {
-            const talhao = dados.status.find((t) => t.talhao_id === evento.target.value);
+            const talhao = dados.talhoes.find((t) => t.talhao_id === evento.target.value);
             setFiltros({ ...filtros, talhao: evento.target.value, fazenda: talhao?.fazenda_id ?? filtros.fazenda });
           }}
         >
           <option value="">Todos os talhões</option>
-          {talhoes.map((t) => (
+          {talhoesDaFazenda.map((t) => (
             <option key={t.talhao_id} value={t.talhao_id}>
               {t.talhao_id} · {t.cultivar}
             </option>

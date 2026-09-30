@@ -46,13 +46,13 @@ export function Indicadores({
   resumo,
   resumoAnterior,
   filtros,
-  status,
+  talhoes,
   periodo,
 }: {
   resumo: Resumo;
   resumoAnterior: Resumo | null;
   filtros: Filtros;
-  status: Talhao[];
+  talhoes: Talhao[];
   periodo: number;
 }) {
   const pctAnomalia = resumo.total ? resumo.comAnomalia / resumo.total : 0;
@@ -64,11 +64,11 @@ export function Indicadores({
     (maior, atual) => (atual[1] > maior[1] ? atual : maior),
   );
 
-  const talhoes = status.filter(
+  const selecionados = talhoes.filter(
     (t) => (!filtros.fazenda || t.fazenda_id === filtros.fazenda) && (!filtros.talhao || t.talhao_id === filtros.talhao),
   );
-  const criticos = talhoes.filter((t) => t.status === "critico").length;
-  const atencao = talhoes.filter((t) => t.status === "atencao").length;
+  const criticos = selecionados.filter((t) => t.status === "critico").length;
+  const atencao = selecionados.filter((t) => t.status === "atencao").length;
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -118,7 +118,7 @@ export function Indicadores({
         valor={
           <>
             {criticos + atencao}
-            <span className="text-base font-normal text-tinta-2"> de {talhoes.length}</span>
+            <span className="text-base font-normal text-tinta-2"> de {selecionados.length}</span>
           </>
         }
         detalhe={`${criticos} críticos · ${atencao} em atenção`}

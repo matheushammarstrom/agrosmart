@@ -121,7 +121,7 @@ export interface LinhaComparativo {
 
 export function comparativoPorLocal(
   ocorrencias: OcorrenciaDiaria[],
-  status: Talhao[],
+  talhoes: Talhao[],
   filtros: Filtros,
   inicio: string,
   fim: string,
@@ -132,7 +132,7 @@ export function comparativoPorLocal(
   );
   const grupos = agrupar(linhas, (linha) => (porTalhao ? linha.talhao_id : linha.fazenda_id));
   const nomes = new Map(
-    status.map((talhao) =>
+    talhoes.map((talhao) =>
       porTalhao ? [talhao.talhao_id, talhao.talhao_id] : [talhao.fazenda_id, talhao.fazenda_nome.replace(/^Fazenda /, "")],
     ),
   );

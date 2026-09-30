@@ -18,21 +18,21 @@ function media(valores: number[]) {
 
 export function GraficoClima({
   clima,
-  status,
+  talhoes,
   filtros,
   inicio,
   fim,
   className,
 }: {
   clima: ClimaDiario[];
-  status: Talhao[];
+  talhoes: Talhao[];
   filtros: Filtros;
   inicio: string;
   fim: string;
   className?: string;
 }) {
   const porFazenda = [...climaPorFazenda(clima, filtros, inicio, fim).entries()];
-  const nomes = new Map(status.map((t) => [t.fazenda_id, `${t.fazenda_nome} · ${t.municipio}/${t.uf}`]));
+  const nomes = new Map(talhoes.map((t) => [t.fazenda_id, `${t.fazenda_nome} · ${t.municipio}/${t.uf}`]));
 
   return (
     <CartaoGrafico

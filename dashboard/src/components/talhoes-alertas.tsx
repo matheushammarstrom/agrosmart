@@ -11,9 +11,9 @@ import { Cartao, ChipStatus } from "./ui";
 const ICONE_ALERTA = { clima: CloudRain, incidencia: Bug };
 const NOME_RISCO: Record<RiscoRequeima, string> = { baixo: "baixo", moderado: "moderado", alto: "alto" };
 
-export function ListaAlertas({ alertas, status, filtros }: { alertas: Alerta[]; status: Talhao[]; filtros: Filtros }) {
+export function ListaAlertas({ alertas, talhoes, filtros }: { alertas: Alerta[]; talhoes: Talhao[]; filtros: Filtros }) {
   const visiveis = filtrarAlertas(alertas, filtros);
-  const nomes = new Map(status.map((t) => [t.fazenda_id, t.fazenda_nome]));
+  const nomes = new Map(talhoes.map((t) => [t.fazenda_id, t.fazenda_nome]));
   const referencia = alertas[0]?.data_referencia;
 
   return (
@@ -60,17 +60,17 @@ export function ListaAlertas({ alertas, status, filtros }: { alertas: Alerta[]; 
 }
 
 export function SituacaoTalhoes({
-  status,
+  talhoes,
   filtros,
   onSelecionar,
   className,
 }: {
-  status: Talhao[];
+  talhoes: Talhao[];
   filtros: Filtros;
   onSelecionar: (fazenda: string, talhao: string) => void;
   className?: string;
 }) {
-  const fazendas = [...new Set(status.map((t) => t.fazenda_id))].filter((f) => !filtros.fazenda || f === filtros.fazenda);
+  const fazendas = [...new Set(talhoes.map((t) => t.fazenda_id))].filter((f) => !filtros.fazenda || f === filtros.fazenda);
 
   return (
     <Cartao
@@ -80,8 +80,8 @@ export function SituacaoTalhoes({
     >
       <div className="space-y-5">
         {fazendas.map((fazenda) => {
-          const talhoes = status.filter((t) => t.fazenda_id === fazenda);
-          const { fazenda_nome, municipio, uf, risco_requeima_atual } = talhoes[0];
+          const daFazenda = talhoes.filter((t) => t.fazenda_id === fazenda);
+          const { fazenda_nome, municipio, uf, risco_requeima_atual } = daFazenda[0];
           return (
             <div key={fazenda}>
               <p className="mb-2 text-xs text-tinta-2">
@@ -89,7 +89,7 @@ export function SituacaoTalhoes({
                 {NOME_RISCO[risco_requeima_atual ?? "baixo"]}
               </p>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                {talhoes.map((talhao) => (
+                {daFazenda.map((talhao) => (
                   <CartaoTalhao
                     key={talhao.talhao_id}
                     talhao={talhao}

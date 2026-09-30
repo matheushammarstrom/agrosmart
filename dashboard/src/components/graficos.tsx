@@ -201,24 +201,24 @@ export function GraficoFrequencia({ resumo, filtros }: { resumo: Resumo; filtros
 
 export function GraficoComparativo({
   ocorrencias,
-  status,
+  talhoes,
   filtros,
   inicio,
   fim,
 }: {
   ocorrencias: OcorrenciaDiaria[];
-  status: Talhao[];
+  talhoes: Talhao[];
   filtros: Filtros;
   inicio: string;
   fim: string;
 }) {
-  const linhas = comparativoPorLocal(ocorrencias, status, filtros, inicio, fim).map((linha) => ({
+  const linhas = comparativoPorLocal(ocorrencias, talhoes, filtros, inicio, fim).map((linha) => ({
     ...linha,
     ...linha.pct,
     rotulo: formatarPct(linha.pctComAnomalia, 1),
   }));
   const anomalias = anomaliasVisiveis(filtros);
-  const nomeFazenda = status.find((t) => t.fazenda_id === filtros.fazenda)?.fazenda_nome;
+  const nomeFazenda = talhoes.find((t) => t.fazenda_id === filtros.fazenda)?.fazenda_nome;
 
   return (
     <CartaoGrafico

@@ -96,11 +96,13 @@ climático alto.
 
 - **Frontend:** Next.js (React com TypeScript), Tailwind CSS para o visual e Recharts para os
   gráficos. Tudo é filtrado no navegador: período, fazenda, talhão e anomalia.
-- **Backend:** uma única rota, `/api/painel`, também em TypeScript. Ela roda no servidor, consulta as
-  tabelas gold pela API de SQL do Databricks e devolve os dados ao navegador. O token do Databricks
-  fica só no servidor.
+- **Backend:** seis rotas em TypeScript, uma por tabela gold: `/api/ocorrencias`, `/api/clima`,
+  `/api/talhoes`, `/api/alertas`, `/api/revisao` e `/api/cargas`. Elas rodam no servidor, consultam
+  o Databricks pela API de SQL e devolvem os dados ao navegador, que chama as seis em paralelo. O
+  token do Databricks fica só no servidor.
 - **Snapshot:** uma cópia das tabelas gold em JSON (`dashboard/src/data/snapshot.json`). Se o
-  Databricks não responder ou não houver credenciais, o painel usa essa cópia e avisa no cabeçalho.
+  Databricks não responder, as rotas devolvem essa cópia e o cabeçalho mostra "Databricks fora do
+  ar", com a data da cópia.
 
 | Seção do painel | Pergunta que responde |
 | --- | --- |
@@ -120,7 +122,7 @@ climático alto.
 | --- | --- |
 | Python | Gerador de dados, classificador, notebooks do pipeline (PySpark), scripts de apoio |
 | SQL | Consultas do painel às tabelas gold |
-| TypeScript | Painel (frontend) e rota `/api/painel` (backend) |
+| TypeScript | Painel (frontend) e as seis rotas `/api/...` (backend) |
 | YAML e Bash | Definição do job (`databricks.yml`) e script de envio de arquivos |
 
 ## Perguntas prováveis e respostas
@@ -138,8 +140,12 @@ Os CSVs em `dados/entrada/` são a origem, e o snapshot é uma cópia das tabela
 **É ETL ou ELT?** Carregamos o dado bruto primeiro (bronze) e transformamos dentro do Databricks
 (silver e gold), o que se aproxima de um ELT na arquitetura medalhão.
 
-**O que acontece se o Databricks estiver fora do ar?** O painel continua funcionando com o snapshot
-e mostra no cabeçalho que está usando a cópia local.
+**O que acontece se o Databricks estiver fora do ar?** O painel continua funcionando com o snapshot,
+a última cópia das tabelas gold, e o cabeçalho mostra "Databricks fora do ar" com a data da cópia.
+
+**Por que uma rota por tabela?** Cada rota tem uma responsabilidade só e pode ser consultada
+separadamente. O navegador chama as seis em paralelo e faz os filtros localmente, então clicar num
+filtro não gera consulta nova ao Databricks.
 
 **Como o dado novo chega?** Um CSV novo no volume landing dispara o job sozinho. Não é preciso
 mexer em código nem rodar nada manualmente.

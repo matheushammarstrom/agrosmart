@@ -87,16 +87,25 @@ export interface Carga {
   periodo_fim: string | null;
 }
 
+export type Fonte = "databricks" | "snapshot";
+
 export interface DadosPainel {
-  fonte: "databricks" | "snapshot";
+  fonte: Fonte;
   atualizadoEm: string;
-  aviso?: string;
+  erro?: string;
   ocorrencias: OcorrenciaDiaria[];
   clima: ClimaDiario[];
-  status: Talhao[];
+  talhoes: Talhao[];
   alertas: Alerta[];
   revisao: ImagemRevisao[];
   cargas: Carga[];
+}
+
+export interface RespostaTabela<T> {
+  fonte: Fonte;
+  atualizadoEm: string;
+  erro?: string;
+  dados: T[];
 }
 
 export interface TabelaBruta {
