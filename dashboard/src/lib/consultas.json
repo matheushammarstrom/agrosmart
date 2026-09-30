@@ -1,0 +1,8 @@
+{
+  "ocorrencias": "SELECT * FROM {db}.gold_ocorrencias_diarias ORDER BY data, talhao_id, tipo_anomalia",
+  "clima": "SELECT * FROM {db}.gold_clima_diario ORDER BY data, fazenda_id",
+  "status": "SELECT * FROM {db}.gold_status_talhoes ORDER BY talhao_id",
+  "alertas": "SELECT * FROM {db}.gold_alertas ORDER BY severidade, tipo, talhao_id",
+  "revisao": "SELECT * FROM {db}.gold_revisao ORDER BY data_captura DESC",
+  "cargas": "SELECT * FROM {db}.gold_cargas ORDER BY ingerido_em DESC, arquivo"
+}

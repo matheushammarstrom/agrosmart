@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --pagina: #f9f9f7;
+  --superficie: #fcfcfb;
+  --superficie-2: #f1f0ec;
+  --tinta: #0b0b0b;
+  --tinta-2: #52514e;
+  --tinta-3: #898781;
+  --grade: #e1e0d9;
+  --eixo: #c3c2b7;
+  --borda: rgba(11, 11, 11, 0.1);
+
+  --serie-requeima: #2a78d6;
+  --serie-pinta-preta: #eb6834;
+  --serie-vaquinha: #1baf7a;
+  --serie-mosca-minadora: #eda100;
+  --faixa-risco: rgba(42, 120, 214, 0.14);
+
+  --status-bom: #0ca30c;
+  --status-atencao: #fab219;
+  --status-serio: #ec835a;
+  --status-critico: #d03b3b;
+  --texto-positivo: #006300;
+  --texto-negativo: #b42828;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --pagina: #0d0d0d;
+    --superficie: #1a1a19;
+    --superficie-2: #242422;
+    --tinta: #ffffff;
+    --tinta-2: #c3c2b7;
+    --tinta-3: #898781;
+    --grade: #2c2c2a;
+    --eixo: #383835;
+    --borda: rgba(255, 255, 255, 0.1);
+
+    --serie-requeima: #3987e5;
+    --serie-pinta-preta: #d95926;
+    --serie-vaquinha: #199e70;
+    --serie-mosca-minadora: #c98500;
+    --faixa-risco: rgba(57, 135, 229, 0.2);
+
+    --texto-positivo: #0ca30c;
+    --texto-negativo: #e66767;
+  }
+}
+
+@theme inline {
+  --color-pagina: var(--pagina);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-tinta: var(--tinta);
+  --color-tinta-2: var(--tinta-2);
+  --color-tinta-3: var(--tinta-3);
+  --color-grade: var(--grade);
+  --color-borda: var(--borda);
+  --color-status-bom: var(--status-bom);
+  --color-status-atencao: var(--status-atencao);
+  --color-status-serio: var(--status-serio);
+  --color-status-critico: var(--status-critico);
+  --color-texto-positivo: var(--texto-positivo);
+  --color-texto-negativo: var(--texto-negativo);
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  background: var(--pagina);
+  color: var(--tinta);
+  font-family: var(--font-sans);
+}
+
+.numeros-tabulares {
+  font-variant-numeric: tabular-nums;
+}

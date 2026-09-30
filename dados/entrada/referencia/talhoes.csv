@@ -1,0 +1,13 @@
+talhao_id,talhao_nome,fazenda_id,fazenda_nome,municipio,uf,latitude,longitude,area_ha,cultivar,sistema_irrigacao
+BV-01,Talhão 01,BV,Fazenda Boa Vista,Bom Repouso,MG,-22.466,-46.147,18,Ágata,aspersão convencional
+BV-02,Talhão 02,BV,Fazenda Boa Vista,Bom Repouso,MG,-22.464,-46.136,22,Asterix,pivô central
+BV-03,Talhão 03,BV,Fazenda Boa Vista,Bom Repouso,MG,-22.475,-46.137,12,Ágata,aspersão convencional
+BV-04,Talhão 04,BV,Fazenda Boa Vista,Bom Repouso,MG,-22.476,-46.146,9,Orchestra,gotejamento
+SC-01,Talhão 01,SC,Fazenda Santa Clara,Guarapuava,PR,-25.388,-51.47,30,Asterix,sequeiro
+SC-02,Talhão 02,SC,Fazenda Santa Clara,Guarapuava,PR,-25.387,-51.456,25,Ágata,sequeiro
+SC-03,Talhão 03,SC,Fazenda Santa Clara,Guarapuava,PR,-25.401,-51.455,20,Atlantic,sequeiro
+SC-04,Talhão 04,SC,Fazenda Santa Clara,Guarapuava,PR,-25.402,-51.468,15,Orchestra,gotejamento
+TI-01,Talhão 01,TI,Fazenda Três Irmãos,São Gotardo,MG,-19.301,-46.059,45,Atlantic,pivô central
+TI-02,Talhão 02,TI,Fazenda Três Irmãos,São Gotardo,MG,-19.3,-46.04,40,Asterix,pivô central
+TI-03,Talhão 03,TI,Fazenda Três Irmãos,São Gotardo,MG,-19.32,-46.039,35,Markies,pivô central
+TI-04,Talhão 04,TI,Fazenda Três Irmãos,São Gotardo,MG,-19.321,-46.058,28,Ágata,aspersão convencional

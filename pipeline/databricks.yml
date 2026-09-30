@@ -1,0 +1,66 @@
+bundle:
+  name: agrosmart
+
+variables:
+  catalogo:
+    description: Catálogo do Unity Catalog (na Free Edition, o padrão é "workspace").
+    default: workspace
+  schema:
+    description: Schema onde ficam as tabelas e os volumes.
+    default: agrosmart
+
+resources:
+  schemas:
+    agrosmart:
+      catalog_name: ${var.catalogo}
+      name: ${var.schema}
+      comment: AgroSmart, monitoramento de folhas de batata (bronze, silver e gold).
+
+  volumes:
+    landing:
+      catalog_name: ${var.catalogo}
+      schema_name: ${resources.schemas.agrosmart.name}
+      name: landing
+      volume_type: MANAGED
+      comment: Arquivos CSV recebidos (análises, clima e cadastros).
+    checkpoints:
+      catalog_name: ${var.catalogo}
+      schema_name: ${resources.schemas.agrosmart.name}
+      name: checkpoints
+      volume_type: MANAGED
+      comment: Estado do Auto Loader.
+
+  jobs:
+    pipeline:
+      name: agrosmart-pipeline
+      description: Ingestão (bronze) → transformação (silver) → agregação (gold) dos dados do AgroSmart.
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      trigger:
+        pause_status: UNPAUSED
+        file_arrival:
+          url: /Volumes/${var.catalogo}/${var.schema}/${resources.volumes.landing.name}/
+      parameters:
+        - name: catalogo
+          default: ${var.catalogo}
+        - name: schema
+          default: ${var.schema}
+      tasks:
+        - task_key: ingestao_bronze
+          notebook_task:
+            notebook_path: ./notebooks/01_ingestao_bronze.py
+        - task_key: transformacao_silver
+          depends_on:
+            - task_key: ingestao_bronze
+          notebook_task:
+            notebook_path: ./notebooks/02_transformacao_silver.py
+        - task_key: agregacao_gold
+          depends_on:
+            - task_key: transformacao_silver
+          notebook_task:
+            notebook_path: ./notebooks/03_agregacao_gold.py
+
+targets:
+  free:
+    default: true
