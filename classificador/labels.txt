@@ -1,0 +1,2 @@
+0 Folha saudável
+1 Folha doente
