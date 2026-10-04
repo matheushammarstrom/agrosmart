@@ -197,19 +197,25 @@ function Cabecalho({
         </div>
       </div>
       <div className="mx-auto max-w-7xl space-y-1 px-4 pb-3 text-xs text-tinta-2 sm:px-6">
-        <p role={!carregando && tentativa?.erro ? "alert" : "status"}>
+        <div role={!carregando && tentativa?.erro ? "alert" : "status"}>
           {carregando ? (
             "Consultando dados…"
           ) : tentativa?.status === "preservada" ? (
-            <><CloudOff size={13} className="mr-1 inline text-status-atencao" aria-hidden />Última consulta falhou; conjunto anterior preservado. {tentativa.erro}</>
+            <><CloudOff size={13} className="mr-1 inline text-status-atencao" aria-hidden />Não foi possível atualizar agora; os dados anteriores foram preservados.</>
           ) : tentativa?.erro ? (
-            <>Conjunto completo recebido; aviso da consulta ao vivo: {tentativa.erro}</>
+            <><CloudOff size={13} className="mr-1 inline text-status-atencao" aria-hidden />Databricks fora do ar no momento. Exibindo a cópia salva em {formatarDataHora(dados.atualizadoEm)}.</>
           ) : tentativa ? (
             "Última consulta: conjunto completo recebido."
           ) : (
             "Snapshot inicial exibido."
           )}
-        </p>
+          {!carregando && tentativa?.erro && (
+            <details className="mt-1 text-tinta-3">
+              <summary className="cursor-pointer">Detalhes técnicos</summary>
+              <p className="mt-1 break-all">{tentativa.erro}</p>
+            </details>
+          )}
+        </div>
 
       </div>
     </header>
