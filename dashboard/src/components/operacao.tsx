@@ -1,6 +1,5 @@
 "use client";
 
-import type { Filtros } from "@/lib/agregacoes";
 import { NOME_ANOMALIA, formatarData, formatarDataHora, formatarNumero, formatarPct } from "@/lib/formatos";
 import type { Carga, ImagemRevisao } from "@/lib/tipos";
 
@@ -8,26 +7,7 @@ import { Cartao, Tabela } from "./ui";
 
 const LIMITE_REVISAO = 12;
 
-export function TabelaRevisao({
-  revisao,
-  filtros,
-  inicio,
-  fim,
-}: {
-  revisao: ImagemRevisao[];
-  filtros: Filtros;
-  inicio: string;
-  fim: string;
-}) {
-  const imagens = revisao.filter(
-    (imagem) =>
-      imagem.data >= inicio &&
-      imagem.data <= fim &&
-      (!filtros.fazenda || imagem.fazenda_id === filtros.fazenda) &&
-      (!filtros.talhao || imagem.talhao_id === filtros.talhao) &&
-      (!filtros.anomalia || imagem.tipo_anomalia === filtros.anomalia),
-  );
-
+export function TabelaRevisao({ imagens }: { imagens: ImagemRevisao[] }) {
   return (
     <Cartao
       titulo={`Fila de revisão manual (${formatarNumero(imagens.length)})`}
@@ -62,6 +42,7 @@ export function TabelaRevisao({
 
 const NOME_FONTE: Record<string, string> = {
   simulado: "Simulado",
+  misto: "Misto",
   classificador_fase1: "Classificador (Fase 1)",
 };
 
@@ -69,7 +50,7 @@ export function TabelaCargas({ cargas }: { cargas: Carga[] }) {
   return (
     <Cartao
       titulo="Cargas de dados no pipeline"
-      subtitulo="Arquivos ingeridos pelo Databricks (bronze) e o resultado da validação (silver)."
+      subtitulo="Arquivos processados e resultado da validação."
     >
       <div className="max-h-80 overflow-auto">
         <Tabela

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartColumn, CircleCheck, OctagonAlert, Table2, TriangleAlert } from "lucide-react";
+import { ChartColumn, CircleCheck, CircleHelp, OctagonAlert, Table2, TriangleAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { NOME_STATUS } from "@/lib/formatos";
@@ -20,9 +20,9 @@ export function Cartao({
   className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-borda bg-superficie p-4 sm:p-5 ${className}`}>
-      <header className="mb-4 flex items-start justify-between gap-3">
-        <div>
+    <section className={`min-w-0 rounded-xl border border-borda bg-superficie p-4 sm:p-5 ${className}`}>
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-40 flex-1">
           <h2 className="text-sm font-semibold text-tinta">{titulo}</h2>
           {subtitulo && <p className="mt-0.5 text-xs text-tinta-2">{subtitulo}</p>}
         </div>
@@ -95,6 +95,7 @@ const ESTILO_STATUS = {
   normal: { Icone: CircleCheck, cor: "var(--status-bom)" },
   atencao: { Icone: TriangleAlert, cor: "var(--status-atencao)" },
   critico: { Icone: OctagonAlert, cor: "var(--status-critico)" },
+  inconclusivo: { Icone: CircleHelp, cor: "var(--tinta-3)" },
 } as const;
 
 export function ChipStatus({ status, rotulo }: { status: StatusTalhao; rotulo?: string }) {

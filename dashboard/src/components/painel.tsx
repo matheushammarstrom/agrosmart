@@ -1,42 +1,69 @@
 "use client";
 
-import { CloudOff, Database, HardDrive, RefreshCw, Sprout, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, CloudOff, Database, HardDrive, RefreshCw, Sprout } from "lucide-react";
+import { useEffect, useMemo, useState, type SetStateAction } from "react";
 
 import {
   FILTROS_INICIAIS,
   calcularJanela,
+  dataReferencia,
   filtrarOcorrencias,
+  filtrarRevisao,
   resumir,
   type Filtros,
 } from "@/lib/agregacoes";
-import { buscarPainel } from "@/lib/api";
-import { ANOMALIAS, NOME_ANOMALIA, formatarData, formatarDataHora, type Anomalia } from "@/lib/formatos";
+import { buscarPainel, type TentativaConsulta, type ResultadoConsultaPainel } from "@/lib/api";
+import { formatarData, formatarDataHora } from "@/lib/formatos";
 import type { DadosPainel } from "@/lib/tipos";
 
 import { GraficoClima } from "./clima";
 import { GraficoComparativo, GraficoFrequencia, GraficoTendencia } from "./graficos";
-import { Indicadores } from "./indicadores";
+import { ComparacaoFazendas, ResumoInspecoes, CaracteristicasTalhoes, OrigemAmostras } from "./resultados";
 import { TabelaCargas, TabelaRevisao } from "./operacao";
-import { ListaAlertas, SituacaoTalhoes } from "./talhoes-alertas";
+
 
 const PERIODOS = [
   { dias: 7, rotulo: "7 dias" },
   { dias: 30, rotulo: "30 dias" },
   { dias: 90, rotulo: "90 dias" },
-  { dias: 0, rotulo: "Safra" },
+  { dias: 0, rotulo: "Todo o período" },
 ];
 
+interface EstadoPainel {
+  dados: DadosPainel;
+  tentativa: TentativaConsulta | null;
+  filtros: Filtros;
+  avisoPeriodo: string;
+}
+
+function receberConsulta(atual: EstadoPainel, consulta: ResultadoConsultaPainel): EstadoPainel {
+  let filtros = atual.filtros;
+  let avisoPeriodo = "";
+  if (filtros.periodo === -1) {
+    try {
+      calcularJanela(consulta.dados, -1, filtros.inicio && filtros.fim ? { inicio: filtros.inicio, fim: filtros.fim } : undefined);
+    } catch {
+      filtros = { ...filtros, periodo: 30, inicio: undefined, fim: undefined };
+      avisoPeriodo = "A cobertura da base mudou. Exibindo os últimos 30 dias disponíveis.";
+    }
+  }
+  return { ...consulta, filtros, avisoPeriodo };
+}
+
 export function Painel({ inicial }: { inicial: DadosPainel }) {
-  const [dados, setDados] = useState(inicial);
+  const [{ dados, tentativa, filtros, avisoPeriodo }, setPainel] = useState<EstadoPainel>({
+    dados: inicial, tentativa: null, filtros: FILTROS_INICIAIS, avisoPeriodo: "",
+  });
   const [carregando, setCarregando] = useState(true);
-  const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIAIS);
+  function setFiltros(alteracao: SetStateAction<Filtros>) {
+    setPainel((atual) => ({ ...atual, filtros: typeof alteracao === "function" ? alteracao(atual.filtros) : alteracao, avisoPeriodo: "" }));
+  }
 
   useEffect(() => {
     let ativo = true;
     buscarPainel(inicial, false).then((novos) => {
       if (!ativo) return;
-      setDados(novos);
+      setPainel((atual) => receberConsulta(atual, novos));
       setCarregando(false);
     });
     return () => {
@@ -46,86 +73,69 @@ export function Painel({ inicial }: { inicial: DadosPainel }) {
 
   async function atualizar() {
     setCarregando(true);
-    setDados(await buscarPainel(dados, true));
+    const consulta = await buscarPainel(dados, true);
+    setPainel((atual) => receberConsulta(atual, consulta));
     setCarregando(false);
   }
 
-  const janela = useMemo(() => calcularJanela(dados, filtros.periodo), [dados, filtros.periodo]);
+  const janela = useMemo(() => calcularJanela(dados, filtros.periodo, filtros.inicio && filtros.fim ? { inicio: filtros.inicio, fim: filtros.fim } : undefined), [dados, filtros.periodo, filtros.inicio, filtros.fim]);
   const ocorrencias = useMemo(
     () => filtrarOcorrencias(dados.ocorrencias, filtros, janela.inicio, janela.fim),
     [dados, filtros, janela],
   );
   const resumo = useMemo(() => resumir(ocorrencias, filtros), [ocorrencias, filtros]);
-  const resumoAnterior = useMemo(
-    () =>
-      janela.anterior
-        ? resumir(filtrarOcorrencias(dados.ocorrencias, filtros, janela.anterior.inicio, janela.anterior.fim), filtros)
-        : null,
-    [dados, filtros, janela],
+  const revisao = useMemo(
+    () => filtrarRevisao(dados.revisao, filtros, janela.inicio, janela.fim),
+    [dados.revisao, filtros, janela],
   );
+  const fazenda = dados.talhoes.find((t) => t.fazenda_id === filtros.fazenda);
 
   return (
     <div className="min-h-screen">
-      <Cabecalho dados={dados} carregando={carregando} onAtualizar={atualizar} />
+      <Cabecalho dados={dados} tentativa={tentativa} carregando={carregando} onAtualizar={atualizar} />
       <BarraFiltros dados={dados} filtros={filtros} setFiltros={setFiltros} inicio={janela.inicio} fim={janela.fim} />
 
-      <main
-        className={`mx-auto max-w-7xl space-y-4 px-4 pt-4 pb-10 transition-opacity sm:px-6 ${
-          carregando ? "opacity-80" : ""
-        }`}
-      >
-        <Indicadores
-          resumo={resumo}
-          resumoAnterior={resumoAnterior}
-          filtros={filtros}
-          talhoes={dados.talhoes}
-          periodo={filtros.periodo}
-        />
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          <ListaAlertas alertas={dados.alertas} talhoes={dados.talhoes} filtros={filtros} />
-          <SituacaoTalhoes
-            className="lg:col-span-2"
-            talhoes={dados.talhoes}
-            filtros={filtros}
-            onSelecionar={(fazenda, talhao) =>
-              setFiltros((atual) => ({ ...atual, fazenda, talhao: atual.talhao === talhao ? "" : talhao }))
-            }
-          />
+      <main className={`mx-auto max-w-7xl space-y-5 px-4 pt-6 pb-10 sm:px-6 ${carregando ? "opacity-80" : ""}`}>
+        <div>
+          {fazenda && <button type="button" onClick={() => setFiltros((atual) => ({ ...atual, fazenda: "", talhao: "", anomalia: "" }))} className="mb-3 inline-flex items-center gap-1.5 text-sm text-tinta-2 hover:underline"><ArrowLeft size={15} aria-hidden />Voltar ao panorama</button>}
+          <h2 className="text-2xl font-semibold tracking-tight">{fazenda ? fazenda.fazenda_nome : "Panorama das fazendas"}</h2>
+          <p className="mt-1 text-sm text-tinta-2">{fazenda ? "Explore os resultados por talhão e acompanhe sua evolução." : "Acompanhe os resultados das inspeções e compare as fazendas."}</p>
         </div>
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          <GraficoTendencia className="lg:col-span-2" ocorrencias={ocorrencias} filtros={filtros} />
-          <GraficoFrequencia resumo={resumo} filtros={filtros} />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          <GraficoComparativo
-            ocorrencias={dados.ocorrencias}
-            talhoes={dados.talhoes}
-            filtros={filtros}
-            inicio={janela.inicio}
-            fim={janela.fim}
-          />
-          <GraficoClima
-            className="lg:col-span-2"
-            clima={dados.clima}
-            talhoes={dados.talhoes}
-            filtros={filtros}
-            inicio={janela.inicio}
-            fim={janela.fim}
-          />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <TabelaRevisao revisao={dados.revisao} filtros={filtros} inicio={janela.inicio} fim={janela.fim} />
-          <TabelaCargas cargas={dados.cargas} />
-        </div>
+        {avisoPeriodo && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-tinta">{avisoPeriodo}</p>}
+        <ResumoInspecoes resumo={resumo} />
+        {!resumo.total && <p role="status" className="rounded-xl border border-borda bg-superficie p-5 text-sm">Sem análises no período selecionado.</p>}
+        {fazenda ? <>
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="talhao" className="text-sm font-medium">Talhão</label>
+            <select id="talhao" value={filtros.talhao} className={CLASSE_SELECT} onChange={(e) => setFiltros({ ...filtros, talhao: e.target.value })}>
+              <option value="">Todos os talhões</option>
+              {dados.talhoes.filter((t) => t.fazenda_id === filtros.fazenda).map((t) => <option key={t.talhao_id} value={t.talhao_id}>{t.talhao_id} · {t.cultivar}</option>)}
+            </select>
+            <span className="text-xs text-tinta-3">Resumo, evolução e tipos acompanham esta seleção.</span>
+          </div>
+          <div className="grid items-start gap-5 lg:grid-cols-3">
+            <GraficoComparativo ocorrencias={dados.ocorrencias} talhoes={dados.talhoes} filtros={filtros} inicio={janela.inicio} fim={janela.fim} />
+            {resumo.total > 0 && <GraficoTendencia className="lg:col-span-2" ocorrencias={ocorrencias} filtros={filtros} />}
+          </div>
+          <div className="grid items-start gap-5 lg:grid-cols-3">
+            <GraficoFrequencia resumo={resumo} filtros={filtros} />
+            <GraficoClima className="lg:col-span-2" clima={dados.clima} talhoes={dados.talhoes} filtros={filtros} inicio={janela.inicio} fim={janela.fim} />
+          </div>
+          <CaracteristicasTalhoes talhoes={dados.talhoes} filtros={filtros} />
+        </> : <ComparacaoFazendas ocorrencias={dados.ocorrencias} talhoes={dados.talhoes} filtros={filtros} inicio={janela.inicio} fim={janela.fim} onExplorar={(id) => setFiltros((atual) => ({ ...atual, fazenda: id, talhao: "" }))} />}
+        <p className="text-xs leading-relaxed text-tinta-3">Dados simulados. Percentuais calculados sobre as folhas analisadas.</p>
+        <details className="rounded-xl border border-borda bg-superficie p-4 sm:p-5">
+          <summary className="cursor-pointer text-sm font-medium">Dados e atualização</summary>
+          <div className="mt-4 space-y-4">
+            <OrigemAmostras ocorrencias={ocorrencias} />
+            <p className="text-xs text-tinta-2">Atualizar consulta os dados mais recentes disponíveis.</p>
+            <div className="grid items-start gap-5 lg:grid-cols-2"><TabelaRevisao imagens={revisao} /><TabelaCargas cargas={dados.cargas} /></div>
+          </div>
+        </details>
       </main>
 
       <footer className="border-t border-borda px-4 py-6 text-center text-xs text-tinta-3">
-        AgroSmart · FIAP Engenharia de Software · Grupo 5. Dados de campo simulados para fins acadêmicos, processados
-        no Databricks (Apache Spark + Delta Lake).
+        AgroSmart · Inspeções de folhas de batata
       </footer>
     </div>
   );
@@ -133,18 +143,19 @@ export function Painel({ inicial }: { inicial: DadosPainel }) {
 
 function Cabecalho({
   dados,
+  tentativa,
   carregando,
   onAtualizar,
 }: {
   dados: DadosPainel;
+  tentativa: TentativaConsulta | null;
   carregando: boolean;
   onAtualizar: () => void;
 }) {
   const aoVivo = dados.fonte === "databricks";
-  const foraDoAr = !aoVivo && Boolean(dados.erro);
   const hora = formatarDataHora(dados.atualizadoEm);
   const fazendas = new Set(dados.talhoes.map((talhao) => talhao.fazenda_id)).size;
-  const referencia = dados.talhoes[0]?.data_referencia;
+  const referencia = dataReferencia(dados);
 
   return (
     <header className="border-b border-borda bg-superficie">
@@ -154,7 +165,7 @@ function Cabecalho({
             <Sprout size={20} className="text-status-bom" aria-hidden />
           </span>
           <div>
-            <h1 className="text-base font-semibold text-tinta">AgroSmart · Painel da lavoura</h1>
+            <h1 className="text-base font-semibold text-tinta">AgroSmart · Inspeções de folhas</h1>
             <p className="text-xs text-tinta-2">
               {fazendas} fazendas · {dados.talhoes.length} talhões de batata
               {referencia && ` · dados até ${formatarData(referencia)}`}
@@ -164,23 +175,15 @@ function Cabecalho({
 
         <div className="flex items-center gap-2">
           <span
+            aria-label="Fonte dos dados"
             className="inline-flex items-center gap-1.5 rounded-full border border-borda px-2.5 py-1 text-xs text-tinta-2"
-            title={dados.erro}
           >
             {aoVivo ? (
               <Database size={13} className="text-status-bom" aria-hidden />
-            ) : foraDoAr ? (
-              <CloudOff size={13} className="text-status-atencao" aria-hidden />
             ) : (
               <HardDrive size={13} className="text-tinta-3" aria-hidden />
             )}
-            {carregando
-              ? "Consultando o Databricks…"
-              : aoVivo
-                ? `Databricks · ao vivo (${hora})`
-                : foraDoAr
-                  ? `Databricks fora do ar · exibindo cópia de ${hora}`
-                  : `Cópia local dos dados (${hora})`}
+            {aoVivo ? `Dados do Databricks (consulta mais antiga: ${hora})` : `Snapshot local (${hora})`}
           </span>
           <button
             type="button"
@@ -192,6 +195,22 @@ function Cabecalho({
             Atualizar
           </button>
         </div>
+      </div>
+      <div className="mx-auto max-w-7xl space-y-1 px-4 pb-3 text-xs text-tinta-2 sm:px-6">
+        <p role={!carregando && tentativa?.erro ? "alert" : "status"}>
+          {carregando ? (
+            "Consultando dados…"
+          ) : tentativa?.status === "preservada" ? (
+            <><CloudOff size={13} className="mr-1 inline text-status-atencao" aria-hidden />Última consulta falhou; conjunto anterior preservado. {tentativa.erro}</>
+          ) : tentativa?.erro ? (
+            <>Conjunto completo recebido; aviso da consulta ao vivo: {tentativa.erro}</>
+          ) : tentativa ? (
+            "Última consulta: conjunto completo recebido."
+          ) : (
+            "Snapshot inicial exibido."
+          )}
+        </p>
+
       </div>
     </header>
   );
@@ -213,90 +232,36 @@ function BarraFiltros({
   inicio: string;
   fim: string;
 }) {
-  const fazendas = [...new Map(dados.talhoes.map((t) => [t.fazenda_id, t])).values()];
-  const talhoesDaFazenda = dados.talhoes.filter((t) => !filtros.fazenda || t.fazenda_id === filtros.fazenda);
-  const alterado = JSON.stringify(filtros) !== JSON.stringify(FILTROS_INICIAIS);
-
+  const limites = calcularJanela(dados, 0);
+  const [inicioCustom, setInicioCustom] = useState("");
+  const [fimCustom, setFimCustom] = useState("");
+  const [erro, setErro] = useState("");
+  function aplicarIntervalo() {
+    try {
+      calcularJanela(dados, -1, { inicio: inicioCustom, fim: fimCustom });
+      setFiltros({ ...filtros, periodo: -1, inicio: inicioCustom, fim: fimCustom });
+      setErro("");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Intervalo inválido.");
+    }
+  }
   return (
-    <div className="sticky top-0 z-20 border-b border-borda bg-pagina/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-2.5 sm:px-6">
-        <div className="flex rounded-lg border border-borda bg-superficie p-0.5" role="group" aria-label="Período">
-          {PERIODOS.map((periodo) => (
-            <button
-              key={periodo.dias}
-              type="button"
-              aria-pressed={filtros.periodo === periodo.dias}
-              onClick={() => setFiltros({ ...filtros, periodo: periodo.dias })}
-              className={`rounded-md px-2.5 py-1 text-xs ${
-                filtros.periodo === periodo.dias ? "bg-superficie-2 font-medium text-tinta" : "text-tinta-2 hover:text-tinta"
-              }`}
-            >
-              {periodo.rotulo}
-            </button>
-          ))}
+    <div className="border-b border-borda bg-superficie">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+        <span className="text-xs font-medium text-tinta-2">Período</span>
+        <div className="flex flex-wrap rounded-lg border border-borda p-0.5" role="group" aria-label="Período">
+          {PERIODOS.map((periodo) => <button key={periodo.dias} type="button" aria-pressed={filtros.periodo === periodo.dias} onClick={() => { setFiltros({ ...filtros, periodo: periodo.dias }); setErro(""); }} className={`rounded-md px-3 py-1.5 text-xs ${filtros.periodo === periodo.dias ? "bg-emerald-50 font-semibold text-emerald-800" : "text-tinta-2 hover:bg-superficie-2"}`}>{periodo.rotulo}</button>)}
         </div>
-
-        <select
-          aria-label="Fazenda"
-          className={CLASSE_SELECT}
-          value={filtros.fazenda}
-          onChange={(evento) => setFiltros({ ...filtros, fazenda: evento.target.value, talhao: "" })}
-        >
-          <option value="">Todas as fazendas</option>
-          {fazendas.map((t) => (
-            <option key={t.fazenda_id} value={t.fazenda_id}>
-              {t.fazenda_nome} ({t.municipio}/{t.uf})
-            </option>
-          ))}
-        </select>
-
-        <select
-          aria-label="Talhão"
-          className={CLASSE_SELECT}
-          value={filtros.talhao}
-          onChange={(evento) => {
-            const talhao = dados.talhoes.find((t) => t.talhao_id === evento.target.value);
-            setFiltros({ ...filtros, talhao: evento.target.value, fazenda: talhao?.fazenda_id ?? filtros.fazenda });
-          }}
-        >
-          <option value="">Todos os talhões</option>
-          {talhoesDaFazenda.map((t) => (
-            <option key={t.talhao_id} value={t.talhao_id}>
-              {t.talhao_id} · {t.cultivar}
-            </option>
-          ))}
-        </select>
-
-        <select
-          aria-label="Anomalia"
-          className={CLASSE_SELECT}
-          value={filtros.anomalia}
-          onChange={(evento) => setFiltros({ ...filtros, anomalia: evento.target.value as Anomalia | "" })}
-        >
-          <option value="">Todas as anomalias</option>
-          {ANOMALIAS.map((anomalia) => (
-            <option key={anomalia} value={anomalia}>
-              {NOME_ANOMALIA[anomalia]}
-            </option>
-          ))}
-        </select>
-
-        {alterado && (
-          <button
-            type="button"
-            onClick={() => setFiltros(FILTROS_INICIAIS)}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-tinta-2 hover:text-tinta"
-          >
-            <X size={13} aria-hidden />
-            Limpar filtros
-          </button>
-        )}
-
-        {inicio && (
-          <span className="ml-auto text-xs text-tinta-3">
-            {formatarData(inicio)} a {formatarData(fim)}
-          </span>
-        )}
+        <details className="text-xs">
+          <summary className="cursor-pointer rounded-lg border border-borda px-3 py-2">Personalizado{filtros.periodo === -1 ? " · ativo" : ""}</summary>
+          <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-borda bg-superficie p-3">
+            <label className="grid gap-1">Data inicial<input type="date" className={CLASSE_SELECT} min={limites.inicio} max={limites.fim} value={inicioCustom} onChange={(e) => setInicioCustom(e.target.value)} /></label>
+            <label className="grid gap-1">Data final<input type="date" className={CLASSE_SELECT} min={limites.inicio} max={limites.fim} value={fimCustom} onChange={(e) => setFimCustom(e.target.value)} /></label>
+            <button type="button" disabled={!limites.fim} onClick={aplicarIntervalo} className="rounded-lg bg-emerald-700 px-3 py-2 font-medium text-white disabled:opacity-50">Aplicar intervalo</button>
+            {erro && <p role="alert" className="w-full text-texto-negativo">{erro}</p>}
+          </div>
+        </details>
+        {inicio && <span className="ml-auto text-xs text-tinta-3">{formatarData(inicio)} a {formatarData(fim)}</span>}
       </div>
     </div>
   );

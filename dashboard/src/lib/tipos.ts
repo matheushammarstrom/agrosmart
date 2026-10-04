@@ -1,8 +1,10 @@
 export type TipoAnomalia = "saudavel" | "requeima" | "pinta_preta" | "vaquinha" | "mosca_minadora";
 export type RiscoRequeima = "baixo" | "moderado" | "alto";
-export type StatusTalhao = "normal" | "atencao" | "critico";
+export type SituacaoClima = "valido" | "desatualizado" | "incompleto" | "ausente";
+export type StatusTalhao = "normal" | "atencao" | "critico" | "inconclusivo";
 
 export interface OcorrenciaDiaria {
+  fonte?: string | null;
   data: string;
   fazenda_id: string;
   talhao_id: string;
@@ -16,14 +18,14 @@ export interface OcorrenciaDiaria {
 export interface ClimaDiario {
   data: string;
   fazenda_id: string;
-  temp_min_c: number;
-  temp_max_c: number;
-  temp_media_c: number;
-  umidade_relativa_pct: number;
-  precipitacao_mm: number;
-  dia_favoravel_requeima: boolean;
-  dias_favoraveis_5d: number;
-  risco_requeima: RiscoRequeima;
+  temp_min_c: number | null;
+  temp_max_c: number | null;
+  temp_media_c: number | null;
+  umidade_relativa_pct: number | null;
+  precipitacao_mm: number | null;
+  dia_favoravel_requeima: boolean | null;
+  dias_favoraveis_5d: number | null;
+  risco_requeima: RiscoRequeima | null;
 }
 
 export interface Talhao {
@@ -48,9 +50,10 @@ export interface Talhao {
   pct_anomalia_principal: number | null;
   risco_requeima_atual: RiscoRequeima | null;
   dias_favoraveis_5d: number | null;
+  data_clima_disponivel?: string | null;
+  situacao_clima?: SituacaoClima | null;
   status: StatusTalhao;
 }
-
 export interface Alerta {
   data_referencia: string;
   fazenda_id: string;
@@ -92,7 +95,6 @@ export type Fonte = "databricks" | "snapshot";
 export interface DadosPainel {
   fonte: Fonte;
   atualizadoEm: string;
-  erro?: string;
   ocorrencias: OcorrenciaDiaria[];
   clima: ClimaDiario[];
   talhoes: Talhao[];

@@ -13,6 +13,10 @@ db = f"{dbutils.widgets.get('catalogo')}.{dbutils.widgets.get('schema')}"
 
 # COMMAND ----------
 
+# MAGIC %run ./agregacao_climatica
+# COMMAND ----------
+
+
 from datetime import timedelta
 
 from pyspark.sql import Window
@@ -21,8 +25,6 @@ from pyspark.sql import functions as F
 JANELA_DIAS = 7
 INCIDENCIA_MEDIA = 0.08
 INCIDENCIA_ALTA = 0.15
-DIAS_FAVORAVEIS_RISCO_ALTO = 3
-DIAS_FAVORAVEIS_RISCO_MODERADO = 2
 
 
 def salvar(df, tabela):
@@ -39,9 +41,9 @@ anomalias = spark.table(f"{db}.silver_anomalias")
 clima = spark.table(f"{db}.silver_clima")
 
 data_referencia = analises.agg(F.max("data")).first()[0]
-inicio_janela = data_referencia - timedelta(days=JANELA_DIAS - 1)
-inicio_janela_anterior = inicio_janela - timedelta(days=JANELA_DIAS)
-fim_janela_anterior = inicio_janela - timedelta(days=1)
+inicio_janela = data_referencia - timedelta(days=JANELA_DIAS - 1) if data_referencia else None
+inicio_janela_anterior = inicio_janela - timedelta(days=JANELA_DIAS) if inicio_janela else None
+fim_janela_anterior = inicio_janela - timedelta(days=1) if inicio_janela else None
 na_janela = F.col("data").between(F.lit(inicio_janela), F.lit(data_referencia))
 print(f"Data de referência: {data_referencia} (janela de {inicio_janela} a {data_referencia})")
 
@@ -51,24 +53,16 @@ print(f"Data de referência: {data_referencia} (janela de {inicio_janela} a {dat
 
 # COMMAND ----------
 
-ocorrencias = analises.groupBy("data", "fazenda_id", "talhao_id", "tipo_anomalia", "grupo").agg(
+ocorrencias = analises.groupBy("data", "fazenda_id", "talhao_id", "tipo_anomalia", "grupo", "fonte").agg(
     F.count("*").alias("qtd_imagens"),
     F.round(F.avg("confianca"), 4).alias("confianca_media"),
     F.sum(F.col("baixa_confianca").cast("int")).alias("qtd_baixa_confianca"),
 )
 
-ultimos_5_dias = Window.partitionBy("fazenda_id").orderBy("data").rowsBetween(-4, 0)
-clima_diario = clima.withColumn(
-    "dias_favoraveis_5d", F.sum(F.col("dia_favoravel_requeima").cast("int")).over(ultimos_5_dias)
-).withColumn(
-    "risco_requeima",
-    F.when(F.col("dias_favoraveis_5d") >= DIAS_FAVORAVEIS_RISCO_ALTO, "alto")
-    .when(F.col("dias_favoraveis_5d") >= DIAS_FAVORAVEIS_RISCO_MODERADO, "moderado")
-    .otherwise("baixo"),
-)
+clima_diario = construir_clima_diario(clima)
 
 salvar(ocorrencias, "gold_ocorrencias_diarias")
-salvar(clima_diario, "gold_clima_diario")
+salvar(clima_diario.drop("_registro_clima"), "gold_clima_diario")
 
 # COMMAND ----------
 
@@ -103,45 +97,37 @@ principal = (
     .select("talhao_id", F.col("tipo_anomalia").alias("anomalia_principal"), F.col("qtd").alias("qtd_anomalia_principal"))
 )
 
-ultimo_dia = Window.partitionBy("fazenda_id").orderBy(F.col("data").desc())
-clima_atual = (
-    clima_diario.filter(F.col("data") <= F.lit(data_referencia))
-    .withColumn("_ordem", F.row_number().over(ultimo_dia))
-    .filter("_ordem = 1")
-    .select("fazenda_id", F.col("risco_requeima").alias("risco_requeima_atual"), "dias_favoraveis_5d")
+clima_atual = situacao_climatica_por_fazenda(
+    clima_diario,
+    talhoes.select("fazenda_id").distinct(),
+    data_referencia,
 )
 
-pct_doentes = F.col("pct_doentes_7d")
 status = (
     talhoes.join(atual, "talhao_id", "left")
     .join(anterior, "talhao_id", "left")
     .join(principal, "talhao_id", "left")
     .join(clima_atual, "fazenda_id", "left")
-    .withColumn("data_referencia", F.lit(data_referencia))
+    .withColumn("data_referencia", F.lit(data_referencia).cast("date"))
     .withColumn("pct_doentes_7d", F.round(percentual("doentes_7d", "imagens_7d"), 4))
     .withColumn("pct_doentes_7d_anterior", F.round(percentual("doentes_7d_anterior", "imagens_7d_anterior"), 4))
     .withColumn("variacao_pp", F.round((F.col("pct_doentes_7d") - F.col("pct_doentes_7d_anterior")) * 100, 1))
     .withColumn("pct_anomalia_principal", F.round(percentual("qtd_anomalia_principal", "imagens_7d"), 4))
-    .withColumn(
-        "status",
-        F.when(pct_doentes >= INCIDENCIA_ALTA, "critico")
-        .when((pct_doentes >= INCIDENCIA_MEDIA) | (F.col("risco_requeima_atual") == "alto"), "atencao")
-        .otherwise("normal"),
-    )
 )
+status = classificar_status_talhoes(status, INCIDENCIA_MEDIA, INCIDENCIA_ALTA)
 salvar(status, "gold_status_talhoes")
+
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Alertas e ações recomendadas
 # MAGIC
-# MAGIC - Incidência: anomalia em 8% ou mais das imagens do talhão nos últimos 7 dias (alta a partir de 15%).
-# MAGIC - Clima: 3 ou mais dos últimos 5 dias favoráveis à requeima na fazenda.
+# MAGIC - Clima: 3 ou mais dias favoráveis nos últimos 5 dias consecutivos completos na fazenda.
 
 # COMMAND ----------
 
-referencia = F.lit(data_referencia).alias("data_referencia")
+referencia = F.lit(data_referencia).cast("date").alias("data_referencia")
 
 alertas_incidencia = (
     anomalias_na_janela.join(atual.select("talhao_id", "imagens_7d"), "talhao_id")
@@ -217,7 +203,7 @@ recebidos = (
     .groupBy(F.col("_arquivo_origem").alias("arquivo"))
     .agg(
         F.count("*").alias("registros_recebidos"),
-        F.max("fonte").alias("fonte"),
+        F.when(F.size(F.collect_set("fonte")) > 1, F.lit("misto")).otherwise(F.max("fonte")).alias("fonte"),
         F.max("_ingerido_em").alias("ingerido_em"),
     )
 )

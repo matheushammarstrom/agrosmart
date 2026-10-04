@@ -14,7 +14,7 @@ import {
 
 import {
   anomaliasVisiveis,
-  comparativoPorLocal,
+  resultadosPorLocal,
   serieTendencia,
   type Filtros,
   type PontoTendencia,
@@ -44,7 +44,7 @@ export function GraficoTendencia({
   filtros: Filtros;
   className?: string;
 }) {
-  const porSemana = filtros.periodo === 0 || filtros.periodo > 30;
+  const porSemana = filtros.periodo === 0 || filtros.periodo > 30 || (filtros.periodo === -1 && Boolean(filtros.inicio && filtros.fim && (Date.parse(filtros.fim) - Date.parse(filtros.inicio)) > 30 * 86400000));
   const serie = serieTendencia(ocorrencias, filtros, porSemana);
   const anomalias = anomaliasVisiveis(filtros);
   const rotuloPeriodo = (chave: string) => (porSemana ? `Semana de ${formatarDiaMes(chave)}` : formatarDiaMes(chave));
@@ -52,7 +52,7 @@ export function GraficoTendencia({
   return (
     <CartaoGrafico
       className={className}
-      titulo="Evolução das anomalias"
+      titulo="Evolução dos problemas"
       subtitulo={`Percentual das imagens com cada anomalia, ${porSemana ? "por semana" : "por dia de inspeção"}`}
       legenda={<Legenda itens={anomalias.map((a) => ({ rotulo: NOME_ANOMALIA[a], cor: COR_ANOMALIA[a] }))} />}
       grafico={
@@ -132,14 +132,14 @@ export function GraficoFrequencia({ resumo, filtros }: { resumo: Resumo; filtros
     anomalia: a,
     nome: NOME_ANOMALIA[a],
     qtd: resumo.porAnomalia[a],
-    rotulo: `${formatarNumero(resumo.porAnomalia[a])} · ${formatarPct(resumo.porAnomalia[a] / (resumo.total || 1), 1)}`,
+    rotulo: `${formatarNumero(resumo.porAnomalia[a])} · ${formatarPct(resumo.porAnomalia[a] / (totalAnomalias || 1), 1)}`,
   })).sort((a, b) => b.qtd - a.qtd);
 
   return (
     <CartaoGrafico
-      titulo="Frequência por tipo de anomalia"
-      subtitulo={`${formatarNumero(totalAnomalias)} imagens com anomalia no período · % sobre todas as imagens`}
-      grafico={
+      titulo="Tipos de problema"
+      subtitulo={`${formatarNumero(totalAnomalias)} amostras com problemas · percentuais entre essas amostras`}
+      grafico={totalAnomalias === 0 ? <p className="py-8 text-center text-sm text-tinta-3">{resumo.total ? "Nenhum problema nas amostras." : "Sem análises no período."}</p> :
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={dados} layout="vertical" margin={{ top: 0, right: 92, left: 0, bottom: 0 }} barSize={22}>
             <XAxis type="number" hide domain={[0, "dataMax"]} />
@@ -160,7 +160,7 @@ export function GraficoFrequencia({ resumo, filtros }: { resumo: Resumo; filtros
                   <CaixaTooltip titulo={`${item.nome} (${GRUPO_ANOMALIA[item.anomalia]})`}>
                     <LinhaTooltip rotulo="Imagens" valor={formatarNumero(item.qtd)} />
                     <LinhaTooltip rotulo="Das imagens analisadas" valor={formatarPct(item.qtd / (resumo.total || 1), 1)} />
-                    <LinhaTooltip rotulo="Das anomalias" valor={formatarPct(item.qtd / (totalAnomalias || 1), 1)} />
+                    <LinhaTooltip rotulo="Das amostras com problemas" valor={formatarPct(item.qtd / (totalAnomalias || 1), 1)} />
                   </CaixaTooltip>
                 );
               }}
@@ -183,15 +183,15 @@ export function GraficoFrequencia({ resumo, filtros }: { resumo: Resumo; filtros
             { rotulo: "Anomalia" },
             { rotulo: "Grupo" },
             { rotulo: "Imagens", numerica: true },
-            { rotulo: "% das imagens", numerica: true },
-            { rotulo: "% das anomalias", numerica: true },
+            { rotulo: "% com problemas", numerica: true },
+            { rotulo: "% de todas as amostras", numerica: true },
           ]}
           linhas={dados.map((item) => [
             item.nome,
             GRUPO_ANOMALIA[item.anomalia],
             formatarNumero(item.qtd),
-            formatarPct(item.qtd / (resumo.total || 1), 1),
-            formatarPct(item.qtd / (totalAnomalias || 1), 1),
+            totalAnomalias ? formatarPct(item.qtd / totalAnomalias, 1) : "—",
+            resumo.total ? formatarPct(item.qtd / resumo.total, 1) : "—",
           ])}
         />
       }
@@ -212,18 +212,18 @@ export function GraficoComparativo({
   inicio: string;
   fim: string;
 }) {
-  const linhas = comparativoPorLocal(ocorrencias, talhoes, filtros, inicio, fim).map((linha) => ({
-    ...linha,
-    ...linha.pct,
-    rotulo: formatarPct(linha.pctComAnomalia, 1),
-  }));
+  const linhas = resultadosPorLocal(ocorrencias, talhoes, filtros, inicio, fim).map(({ id, nome, resumo }) => {
+    const pct = Object.fromEntries(ANOMALIAS.map((a) => [a, resumo.total ? resumo.porAnomalia[a] / resumo.total : null]));
+    return { id, nome, total: resumo.total, pct, ...pct, pctComAnomalia: resumo.total ? resumo.comAnomalia / resumo.total : null,
+      rotulo: resumo.total ? formatarPct(resumo.comAnomalia / resumo.total, 1) : "Sem análises" };
+  });
   const anomalias = anomaliasVisiveis(filtros);
   const nomeFazenda = talhoes.find((t) => t.fazenda_id === filtros.fazenda)?.fazenda_nome;
 
   return (
     <CartaoGrafico
-      titulo={nomeFazenda ? `Comparativo entre talhões · ${nomeFazenda}` : "Comparativo por localidade"}
-      subtitulo="Percentual das imagens com anomalia no período"
+      titulo={nomeFazenda ? "Resultados por talhão" : "Comparativo por fazenda"}
+      subtitulo="Percentual no período · comparação dos talhões da fazenda."
       legenda={<Legenda itens={anomalias.map((a) => ({ rotulo: NOME_ANOMALIA[a], cor: COR_ANOMALIA[a] }))} />}
       grafico={
         <ResponsiveContainer width="100%" height={Math.max(150, linhas.length * 34 + 20)}>
@@ -281,7 +281,7 @@ export function GraficoComparativo({
           linhas={linhas.map((linha) => [
             linha.nome,
             formatarNumero(linha.total),
-            formatarPct(linha.pctComAnomalia, 1),
+            linha.total ? formatarPct(linha.pctComAnomalia, 1) : "—",
             ...anomalias.map((a) => formatarPct(linha.pct[a], 1)),
           ])}
         />

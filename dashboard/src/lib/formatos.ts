@@ -1,4 +1,4 @@
-import type { StatusTalhao, TipoAnomalia } from "./tipos";
+import type { RiscoRequeima, SituacaoClima, StatusTalhao, TipoAnomalia } from "./tipos";
 
 export const ANOMALIAS = ["requeima", "pinta_preta", "vaquinha", "mosca_minadora"] as const;
 export type Anomalia = (typeof ANOMALIAS)[number];
@@ -29,7 +29,31 @@ export const NOME_STATUS: Record<StatusTalhao, string> = {
   normal: "Normal",
   atencao: "Atenção",
   critico: "Crítico",
+  inconclusivo: "Inconclusivo",
 };
+
+export const NOME_SITUACAO_CLIMA: Record<SituacaoClima, string> = {
+  valido: "válido",
+  desatualizado: "desatualizado",
+  incompleto: "incompleto",
+  ausente: "ausente",
+};
+
+export const NOME_RISCO: Record<RiscoRequeima, string> = {
+  baixo: "baixo",
+  moderado: "moderado",
+  alto: "alto",
+};
+
+export function nomeRisco(risco: RiscoRequeima | null | undefined) {
+  return risco ? NOME_RISCO[risco] : "indisponível";
+}
+
+export function descricaoClima(situacao: SituacaoClima | null | undefined, data: string | null | undefined) {
+  if (!situacao) return "Situação climática não informada";
+  const dataFormatada = data ? ` · último registro em ${formatarData(data)}` : "";
+  return `Clima ${NOME_SITUACAO_CLIMA[situacao]}${dataFormatada}`;
+}
 
 const numero = new Intl.NumberFormat("pt-BR");
 

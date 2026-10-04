@@ -3,13 +3,14 @@
 import { ArrowDown, ArrowUp, Bug, CloudRain, TriangleAlert } from "lucide-react";
 
 import { filtrarAlertas, type Filtros } from "@/lib/agregacoes";
-import { COR_ANOMALIA, NOME_ANOMALIA, formatarData, formatarPct, formatarPontos, type Anomalia } from "@/lib/formatos";
-import type { Alerta, RiscoRequeima, Talhao } from "@/lib/tipos";
+import { COR_ANOMALIA, NOME_ANOMALIA, descricaoClima, formatarData, formatarPct, formatarPontos, nomeRisco, type Anomalia } from "@/lib/formatos";
+import type { Alerta, Talhao } from "@/lib/tipos";
 
 import { Cartao, ChipStatus } from "./ui";
 
 const ICONE_ALERTA = { clima: CloudRain, incidencia: Bug };
-const NOME_RISCO: Record<RiscoRequeima, string> = { baixo: "baixo", moderado: "moderado", alto: "alto" };
+
+
 
 export function ListaAlertas({ alertas, talhoes, filtros }: { alertas: Alerta[]; talhoes: Talhao[]; filtros: Filtros }) {
   const visiveis = filtrarAlertas(alertas, filtros);
@@ -81,12 +82,13 @@ export function SituacaoTalhoes({
       <div className="space-y-5">
         {fazendas.map((fazenda) => {
           const daFazenda = talhoes.filter((t) => t.fazenda_id === fazenda);
-          const { fazenda_nome, municipio, uf, risco_requeima_atual } = daFazenda[0];
+          const { fazenda_nome, municipio, uf, situacao_clima, data_clima_disponivel } = daFazenda[0];
+          const risco = situacao_clima === "valido" ? nomeRisco(daFazenda[0].risco_requeima_atual) : "indisponível";
           return (
             <div key={fazenda}>
               <p className="mb-2 text-xs text-tinta-2">
-                <span className="font-medium text-tinta">{fazenda_nome}</span> · {municipio}/{uf} · risco de requeima{" "}
-                {NOME_RISCO[risco_requeima_atual ?? "baixo"]}
+                <span className="font-medium text-tinta">{fazenda_nome}</span> · {municipio}/{uf} · risco de requeima {risco}
+                <span className="block text-tinta-3">{descricaoClima(situacao_clima, data_clima_disponivel)}</span>
               </p>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {daFazenda.map((talhao) => (
@@ -108,6 +110,7 @@ export function SituacaoTalhoes({
 
 function CartaoTalhao({ talhao, selecionado, onClick }: { talhao: Talhao; selecionado: boolean; onClick: () => void }) {
   const variacao = talhao.variacao_pp ?? 0;
+  const status = talhao.status === "normal" && talhao.situacao_clima !== "valido" ? "inconclusivo" : talhao.status;
   const principal = talhao.anomalia_principal as Anomalia | null;
   const Seta = variacao > 0 ? ArrowUp : ArrowDown;
 
@@ -122,7 +125,7 @@ function CartaoTalhao({ talhao, selecionado, onClick }: { talhao: Talhao; seleci
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-tinta">{talhao.talhao_id}</span>
-        <ChipStatus status={talhao.status} />
+        <ChipStatus status={status} />
       </div>
       <p className="mt-2 text-xl font-semibold text-tinta">
         {formatarPct(talhao.pct_doentes_7d)}

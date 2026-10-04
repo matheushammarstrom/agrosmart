@@ -2,12 +2,12 @@
 
 :root {
   color-scheme: light;
-  --pagina: #f9f9f7;
-  --superficie: #fcfcfb;
+  --pagina: #f5f8f5;
+  --superficie: #ffffff;
   --superficie-2: #f1f0ec;
-  --tinta: #0b0b0b;
+  --tinta: #243b35;
   --tinta-2: #52514e;
-  --tinta-3: #898781;
+  --tinta-3: #68756e;
   --grade: #e1e0d9;
   --eixo: #c3c2b7;
   --borda: rgba(11, 11, 11, 0.1);
@@ -24,30 +24,6 @@
   --status-critico: #d03b3b;
   --texto-positivo: #006300;
   --texto-negativo: #b42828;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --pagina: #0d0d0d;
-    --superficie: #1a1a19;
-    --superficie-2: #242422;
-    --tinta: #ffffff;
-    --tinta-2: #c3c2b7;
-    --tinta-3: #898781;
-    --grade: #2c2c2a;
-    --eixo: #383835;
-    --borda: rgba(255, 255, 255, 0.1);
-
-    --serie-requeima: #3987e5;
-    --serie-pinta-preta: #d95926;
-    --serie-vaquinha: #199e70;
-    --serie-mosca-minadora: #c98500;
-    --faixa-risco: rgba(57, 135, 229, 0.2);
-
-    --texto-positivo: #0ca30c;
-    --texto-negativo: #e66767;
-  }
 }
 
 @theme inline {
@@ -77,3 +53,5 @@ body {
 .numeros-tabulares {
   font-variant-numeric: tabular-nums;
 }
+
+button, select, input, summary { outline-offset: 3px; }

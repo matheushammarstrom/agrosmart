@@ -45,17 +45,20 @@ function Variacao({ pontos, subirEhRuim = true }: { pontos: number; subirEhRuim?
 export function Indicadores({
   resumo,
   resumoAnterior,
+  totalRevisao,
   filtros,
   talhoes,
   periodo,
 }: {
   resumo: Resumo;
   resumoAnterior: Resumo | null;
+  totalRevisao: number;
   filtros: Filtros;
   talhoes: Talhao[];
   periodo: number;
 }) {
-  const pctAnomalia = resumo.total ? resumo.comAnomalia / resumo.total : 0;
+  const pctAnomalia = resumo.total ? resumo.comAnomalia / resumo.total : null;
+  const pctSaudaveis = resumo.total ? resumo.saudaveis / resumo.total : null;
   const pctAnterior = resumoAnterior?.total ? resumoAnterior.comAnomalia / resumoAnterior.total : null;
   const rotuloAnomalia = filtros.anomalia ? NOME_ANOMALIA[filtros.anomalia].toLowerCase() : "anomalia";
   const comparacao = periodo ? `vs. ${periodo} dias anteriores` : "";
@@ -81,13 +84,13 @@ export function Indicadores({
       <div className="col-span-2 rounded-xl border border-borda bg-superficie p-4 lg:col-span-1">
         <p className="text-xs text-tinta-2">Folhas saudáveis × com {rotuloAnomalia}</p>
         <div className="mt-1 flex items-baseline gap-2">
-          <span className="text-2xl font-semibold text-tinta">{formatarPct(1 - pctAnomalia)}</span>
-          <span className="text-sm text-tinta-2">× {formatarPct(pctAnomalia, 1)}</span>
+          <span className="text-2xl font-semibold text-tinta">{pctSaudaveis === null ? "—" : formatarPct(pctSaudaveis)}</span>
+          <span className="text-sm text-tinta-2">× {pctAnomalia === null ? "—" : formatarPct(pctAnomalia, 1)}</span>
         </div>
         <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-superficie-2" aria-hidden>
-          <div className="h-full bg-tinta-2" style={{ width: `${pctAnomalia * 100}%` }} />
+          <div className="h-full bg-tinta-2" style={{ width: `${(pctAnomalia ?? 0) * 100}%` }} />
         </div>
-        {pctAnterior !== null && (
+        {pctAnomalia !== null && pctAnterior !== null && (
           <p className="mt-1.5 text-xs text-tinta-2">
             Com {rotuloAnomalia}: <Variacao pontos={(pctAnomalia - pctAnterior) * 100} /> {comparacao}
           </p>
@@ -126,8 +129,8 @@ export function Indicadores({
 
       <Indicador
         rotulo="Imagens para revisão"
-        valor={formatarNumero(resumo.baixaConfianca)}
-        detalhe={`confiança abaixo de 80% · ${formatarPct(resumo.total ? resumo.baixaConfianca / resumo.total : 0, 1)}`}
+        valor={formatarNumero(totalRevisao)}
+        detalhe={`confiança abaixo de 80% · ${resumo.total ? formatarPct(totalRevisao / resumo.total, 1) : "—"}`}
       />
     </div>
   );

@@ -1,14 +1,16 @@
 import { ANOMALIAS, type Anomalia } from "./formatos";
-import type { Alerta, ClimaDiario, DadosPainel, OcorrenciaDiaria, Talhao } from "./tipos";
+import type { Alerta, ClimaDiario, DadosPainel, ImagemRevisao, OcorrenciaDiaria, Talhao } from "./tipos";
 
 export interface Filtros {
   periodo: number;
   fazenda: string;
   talhao: string;
   anomalia: Anomalia | "";
+  inicio?: string;
+  fim?: string;
 }
 
-export const FILTROS_INICIAIS: Filtros = { periodo: 90, fazenda: "", talhao: "", anomalia: "" };
+export const FILTROS_INICIAIS: Filtros = { periodo: 30, fazenda: "", talhao: "", anomalia: "" };
 
 export interface Janela {
   inicio: string;
@@ -31,8 +33,19 @@ export function dataReferencia(dados: DadosPainel) {
   return dados.ocorrencias.reduce((maior, linha) => (linha.data > maior ? linha.data : maior), "");
 }
 
-export function calcularJanela(dados: DadosPainel, periodo: number): Janela {
+export function calcularJanela(dados: DadosPainel, periodo: number, intervalo?: { inicio: string; fim: string }): Janela {
   const fim = dataReferencia(dados);
+  if (fim && periodo === -1) {
+    const primeira = dados.ocorrencias.reduce((menor, linha) => linha.data < menor ? linha.data : menor, fim);
+    if (!intervalo || !/^\d{4}-\d{2}-\d{2}$/.test(intervalo.inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(intervalo.fim)
+      || intervalo.inicio < primeira || intervalo.fim > fim || intervalo.inicio > intervalo.fim
+      || !Number.isFinite(Date.parse(intervalo.inicio)) || !Number.isFinite(Date.parse(intervalo.fim))
+      || new Date(intervalo.inicio).toISOString().slice(0, 10) !== intervalo.inicio
+      || new Date(intervalo.fim).toISOString().slice(0, 10) !== intervalo.fim) {
+      throw new Error("Escolha um intervalo válido dentro das datas disponíveis.");
+    }
+    return { ...intervalo, anterior: null };
+  }
   if (!fim || periodo === 0) {
     const inicio = dados.ocorrencias.reduce((menor, linha) => (linha.data < menor ? linha.data : menor), fim);
     return { inicio, fim, anterior: null };
@@ -66,11 +79,19 @@ export function filtrarOcorrencias(ocorrencias: OcorrenciaDiaria[], filtros: Fil
   return ocorrencias.filter((linha) => noLocal(linha, filtros) && entre(linha.data, inicio, fim));
 }
 
+export function filtrarRevisao(revisao: ImagemRevisao[], filtros: Filtros, inicio: string, fim: string) {
+  return revisao.filter(
+    (imagem) =>
+      noLocal(imagem, filtros) &&
+      entre(imagem.data, inicio, fim) &&
+      (!filtros.anomalia || imagem.tipo_anomalia === filtros.anomalia),
+  );
+}
+
 export interface Resumo {
   total: number;
   saudaveis: number;
   comAnomalia: number;
-  baixaConfianca: number;
   porAnomalia: Record<Anomalia, number>;
 }
 
@@ -78,15 +99,13 @@ export function resumir(linhas: OcorrenciaDiaria[], filtros: Filtros): Resumo {
   const porAnomalia = Object.fromEntries(ANOMALIAS.map((anomalia) => [anomalia, 0])) as Record<Anomalia, number>;
   let total = 0;
   let saudaveis = 0;
-  let baixaConfianca = 0;
   for (const linha of linhas) {
     total += linha.qtd_imagens;
-    baixaConfianca += linha.qtd_baixa_confianca;
     if (linha.tipo_anomalia === "saudavel") saudaveis += linha.qtd_imagens;
     else porAnomalia[linha.tipo_anomalia] += linha.qtd_imagens;
   }
   const comAnomalia = filtros.anomalia ? porAnomalia[filtros.anomalia] : total - saudaveis;
-  return { total, saudaveis, comAnomalia, baixaConfianca, porAnomalia };
+  return { total, saudaveis, comAnomalia, porAnomalia };
 }
 
 export function anomaliasVisiveis(filtros: Filtros): readonly Anomalia[] {
@@ -166,4 +185,31 @@ export function filtrarAlertas(alertas: Alerta[], filtros: Filtros) {
         ORDEM_TIPO[a.tipo] - ORDEM_TIPO[b.tipo] ||
         (a.talhao_id ?? "").localeCompare(b.talhao_id ?? ""),
     );
+}
+
+
+export function resultadosPorLocal(
+  ocorrencias: OcorrenciaDiaria[], talhoes: Talhao[], filtros: Filtros, inicio: string, fim: string,
+) {
+  const locais = new Map<string, { id: string; nome: string }>();
+  for (const talhao of talhoes) {
+    if (filtros.fazenda && talhao.fazenda_id !== filtros.fazenda) continue;
+    const id = filtros.fazenda ? talhao.talhao_id : talhao.fazenda_id;
+    locais.set(id, { id, nome: filtros.fazenda ? talhao.talhao_id : talhao.fazenda_nome });
+  }
+  return [...locais.values()].map((local) => ({
+    ...local,
+    resumo: resumir(ocorrencias.filter((linha) =>
+      (filtros.fazenda ? linha.talhao_id : linha.fazenda_id) === local.id && entre(linha.data, inicio, fim)),
+      { ...filtros, talhao: "", anomalia: "" }),
+  }));
+}
+
+export function resumirOrigens(linhas: OcorrenciaDiaria[]) {
+  const totais = { simulado: 0, classificador_fase1: 0, nao_informada: 0 };
+  for (const linha of linhas) {
+    const fonte = linha.fonte === "simulado" || linha.fonte === "classificador_fase1" ? linha.fonte : "nao_informada";
+    totais[fonte] += linha.qtd_imagens;
+  }
+  return totais;
 }
